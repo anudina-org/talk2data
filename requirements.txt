@@ -1,0 +1,5 @@
+streamlit
+sqlalchemy
+chromadb
+ollama
+psycopg2-binary
