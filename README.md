@@ -136,3 +136,87 @@ ChromaDB
     └── doc: domain description
         meta: view_name, columns, domain
 ```
+
+---
+
+# Chat Bot
+
+> Ask questions about your data in plain English — no SQL required.
+
+---
+
+## What Is This?
+
+The Talk2Data Chat Bot is the query interface for teams whose data has been onboarded. Once a team's database is registered via the Onboarding App, anyone on that team can open this app and ask natural language questions directly against their live data.
+
+---
+
+## Who Is This For?
+
+- **Business users and analysts** who want answers from data without writing SQL
+- **Team leads** who need quick ad-hoc lookups across their team's database
+- Anyone who has completed the onboarding step and wants to start querying
+
+---
+
+## What Does It Do?
+
+### Connects to Your Database
+Enter your Postgres connection URL in the sidebar. The app verifies the connection and lists all available tables and views so you know exactly what data is queryable.
+
+### Translates Plain English to SQL
+Type any question in the chat input — the app uses a local LLM (`qwen3:8b` via Ollama) to generate the correct SQL query automatically. The model inspects your full database schema at query time, so it always picks the right table or view.
+
+### Shows Its Work
+Every response includes a **Query Details** expander with:
+- The exact SQL that was executed (syntax-highlighted)
+- The LLM's rationale for choosing that particular table or view
+
+### Returns Results + a Summary
+Query results are displayed as an interactive data table. The LLM also generates a concise, friendly summary of the results so you don't have to interpret raw rows.
+
+### Logs Everything
+All LLM prompts, generated SQL, rationales, row counts, and errors are logged to the terminal with timestamps — useful for debugging or auditing queries.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|-------------|---------|
+| Onboarding complete | Run the Onboarding App first so your database has at least one registered view |
+| Ollama running locally | The chat bot calls `http://localhost:11434` with model `qwen3:8b` |
+| ChromaDB running | Metadata index must be available at `localhost:8000` |
+| Postgres accessible | The connection URL must be reachable from where the app runs |
+
+---
+
+## How to Use
+
+```bash
+streamlit run app/chat_bot.py
+```
+
+1. Enter your Postgres connection URL in the sidebar
+2. Verify the sidebar shows your expected tables and views
+3. Type a question in the chat input, e.g.:
+   - *"List all employees"*
+   - *"Show me salaries above 80000"*
+   - *"Which department has the most headcount?"*
+4. The app returns a summary and a data table — expand **Query Details** to see the SQL and rationale
+
+---
+
+## Configuration
+
+Edit the constants at the top of `app/chat_bot.py`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MODEL_NAME` | `qwen3:8b` | Ollama model used for SQL generation and summarization |
+| `CHROMA_HOST` | `localhost` | ChromaDB host |
+| `CHROMA_PORT` | `8000` | ChromaDB port |
+
+
+Sample Run: 
+![alt text](image.png)
