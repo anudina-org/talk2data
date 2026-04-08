@@ -66,7 +66,7 @@ def build_schema_context(engine):
         schema[name] = [c['name'] for c in inspector.get_columns(name)]
     return schema
 
-def get_sql_from_ai(user_query, engine):
+def get_sql_from_ai(user_query, engine, conversation_history=None):
     logger.info("User Natural Query is :\n%s", user_query)
 
     schema = build_schema_context(engine)
@@ -76,17 +76,30 @@ def get_sql_from_ai(user_query, engine):
         f"  - {name}: {cols}" for name, cols in schema.items()
     )
 
+    # Build conversation context from prior turns (last 6 messages to avoid token bloat)
+    history_block = ""
+    if conversation_history:
+        recent = conversation_history[-6:]
+        history_lines = "\n".join(
+            f"  {msg['role'].upper()}: {msg['content']}" for msg in recent
+        )
+        history_block = f"""
+    [CONVERSATION HISTORY]
+{history_lines}
+"""
+
     # Precise Prompting
     prompt = f"""
     [SYSTEM] You are a PostgreSQL Expert.
     [CONTEXT] The database has the following tables and views with their columns:
 {schema_lines}
-
+{history_block}
     [RULES]
     1. Use ONLY the tables/views and columns listed above.
     2. Choose the most relevant table or view based on the user's question.
-    3. Use ILIKE for text searches to be case-insensitive.
-    4. Return the raw SQL code that is generated without fail. and explanation why you chose that table or view.just the SQL and a brief rationale.
+    3. Use the conversation history to understand follow-up questions and maintain context.
+    4. Use ILIKE for text searches to be case-insensitive.
+    5. Return the raw SQL code that is generated without fail. and explanation why you chose that table or view. Just the SQL and a brief rationale.
 
     [USER QUESTION] {user_query}
     """
@@ -130,8 +143,11 @@ if user_input := st.chat_input("Ask about employees, salaries, or projects..."):
         with st.spinner("Generating SQL and analyzing..."):
             generated_sql = None
             try:
-                # A. Generate SQL
-                generated_sql, rationale = get_sql_from_ai(user_input, engine)
+                # A. Generate SQL (pass history excluding the just-appended user message)
+                generated_sql, rationale = get_sql_from_ai(
+                    user_input, engine,
+                    conversation_history=st.session_state.messages[:-1]
+                )
 
                 with st.expander("Query Details"):
                     st.code(generated_sql, language="sql")
@@ -167,7 +183,12 @@ if user_input := st.chat_input("Ask about employees, salaries, or projects..."):
                 if not df.empty:
                     st.dataframe(df)
                 
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                # Store a compact history entry: just the SQL + first 2 rows of data
+                # so conversation history doesn't balloon the prompt on follow-ups
+                compact_history = f"[SQL used: {generated_sql}]"
+                if not df.empty:
+                    compact_history += f"\n[Returned {len(df)} rows. Sample: {df.head(2).to_dict(orient='records')}]"
+                st.session_state.messages.append({"role": "assistant", "content": compact_history})
 
             except Exception as e:
                 logger.error("Pipeline error: %s", e, exc_info=True)

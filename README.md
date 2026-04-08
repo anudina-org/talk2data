@@ -220,3 +220,6 @@ Edit the constants at the top of `app/chat_bot.py`:
 
 Sample Run: 
 ![alt text](image.png)
+
+![alt text](image-1.png)
+![alt text](image-2.png)
