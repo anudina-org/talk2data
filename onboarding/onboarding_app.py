@@ -8,11 +8,19 @@ import json
 MODEL_NAME = "qwen3:8b"
 
 st.set_page_config(page_title="Team Onboarder", layout="wide")
-db_url = "postgresql://postgres:postgres@localhost:5432/talk_2data_employee_rdb"
-# --- DATABASE & CHROMA SETUP ---
-# with st.sidebar:
-#     db_url = st.text_input("Postgres URL", placeholder="postgresql://postgres:postgres@localhost:5432/talk_2data_employee_rdb")
-#     if not db_url: st.stop()
+# db_url = "postgresql://postgres:postgres@localhost:5432/talk_2data_employee_rdb"
+#--- DATABASE & CHROMA SETUP ---
+with st.sidebar:
+    # db_type = st.selectbox("Database", ["PostgreSQL", "MySQL", "SQL Server", "Oracle"])
+    db_type = st.selectbox("Database", ["PostgreSQL"])
+    placeholders = {
+        "PostgreSQL": "postgresql://postgres:postgres@localhost:5432/talk_2data_employee_rdb",
+        # "MySQL":      "mysql+pymysql://user:pass@host:3306/db",
+        # "SQL Server": "mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+17+for+SQL+Server",
+        # "Oracle":     "oracle+cx_oracle://user:pass@host:1521/service",
+    }
+    db_url = st.text_input("Connection URL", placeholder=placeholders[db_type])
+    if not db_url: st.stop()
 
 engine = sa.create_engine(db_url)
 chroma_client = chromadb.HttpClient(host='localhost', port=8000)
@@ -65,7 +73,8 @@ if selected_tables:
         [OUTPUT] Return ONLY the 'CREATE OR REPLACE VIEW' SQL. No markdown.
         """
         sql = ollama.generate(model=MODEL_NAME, prompt=sql_prompt)['response'].strip().replace('```sql', '').replace('```', '')
-        
+        if engine.dialect.name == 'mssql':
+            sql = sql.replace("CREATE OR REPLACE VIEW", "CREATE OR ALTER VIEW")
         with engine.connect() as conn:
             conn.execute(sa.text(f"DROP VIEW IF EXISTS {view_name} CASCADE;"))
             conn.execute(sa.text(sql))
